@@ -1,57 +1,145 @@
-# ZANT – Narzędzie Wspomagające Obsługę Wypadków przy Pracy
+# ZANT – Narzędzie Wspomagające Obsługę Wypadków przy Pracy  
+## Etap II – Asystent Analityczny dla Pracowników ZUS
 
-## O narzędziu Etap 2
+🔗 **Demo online:** https://ascii-spring-81419685.figma.site
 
-ZANT to aplikacja stworzona, aby **wspierać pracowników ZUS** w codziennej pracy przy obsłudze zawiadomień o wypadkach. Narzędzie działa jak "inteligentny asystent", który wykonuje najbardziej czasochłonne czynności – czytanie dokumentów, wyłapywanie dat i faktów – pozostawiając urzędnikowi ostateczną decyzję.
+ZANT to inteligentny asystent, który wspiera **pracowników ZUS** w analizie zgłoszeń wypadków przy pracy.  
+System automatyzuje żmudne i czasochłonne czynności: od odczytywania skanów i pisma odręcznego, przez analizę faktów, aż po przygotowanie projektu **Karty Wypadku** i **projektu opinii**.
 
-Głównym celem jest ułatwienie pracy osobom sporządzającym karty wypadku oraz przygotowującym opinie, poprzez automatyzację żmudnego przepisywania danych z papierowych formularzy i skanów.
-
----
-
-## Jak narzędzie pomaga urzędnikowi?
-
-Aplikacja realizuje konkretne zadania, o które prosił zamawiający:
-
-### 1. Czytanie "trudnych" dokumentów (OCR)
-Pracownik nie musi ręcznie przepisywać danych z odręcznych notatek czy zamazanych skanów.
-- Narzędzie odczytuje skany PDF, zdjęcia oraz **pismo odręczne** (np. wyjaśnienia poszkodowanego).
-- System radzi sobie z dokumentacją papierową przekształconą na cyfrową.
-
-### 2. Sprawdzanie spójności faktów
-Asystent automatycznie porównuje dokumenty i zwraca uwagę pracownika na ewentualne pomyłki, np.:
-- "Data wypadku w zgłoszeniu (12.05) różni się od daty u lekarza (13.05)".
-- "Świadek podaje inne miejsce zdarzenia niż poszkodowany".
-
-### 3. Wstępna analiza przesłanek wypadku
-System porządkuje informacje potrzebne do podjęcia decyzji, sprawdzając cztery kluczowe elementy definicji wypadku:
-- Czy zdarzenie było nagłe?
-- Czy była przyczyna zewnętrzna?
-- Czy wystąpił uraz?
-- Czy miało to związek z pracą?
-
-### 4. Sugerowanie braków w dokumentacji
-Jeśli w aktach brakuje kluczowych informacji, narzędzie podpowiada pracownikowi:
-- "Brakuje wyjaśnień świadka zdarzenia – warto je pozyskać".
-- "Opis urazu jest niejasny".
-
-### 5. Wsparcie w kwestiach medycznych
-Gdy opis urazu jest skomplikowany, system sugeruje konsultację z Lekarzem Orzecznikiem i pomaga sformułować precyzyjne pytanie (np. o odróżnienie urazu od choroby samoistnej).
-
-### 6. Przygotowanie projektu opinii (brudnopis)
-Na koniec analizy narzędzie generuje **wstępny projekt opinii**. Pracownik otrzymuje gotowy tekst z:
-- Uporządkowanym stanem faktycznym.
-- Propozycją uzasadnienia.
-- Wnioskami do weryfikacji przez urzędnika.
-
-### 7. Wypełnianie Karty Wypadku
-System automatycznie uzupełnia projekt **Karty Wypadku** (zgodnie z obowiązującym rozporządzeniem) danymi wyciągniętymi z dokumentów. Pola, których nie udało się odczytać jednoznacznie, są wyraźnie oznaczane jako "DO UZUPEŁNIENIA", aby pracownik mógł je łatwo znaleźć i poprawić.
+Model został wytrenowany na bazie **rzeczywistych spraw ZUS**, dzięki czemu potrafi rozpoznawać wzorce dokumentacji, typowe opisy zdarzeń i najczęściej pojawiające się braki.
 
 ---
 
-## Technologia w służbie urzędnika
+## 🎯 Cel narzędzia
 
-Narzędzie działa w tle, wykorzystując nowoczesne rozwiązania do analizy tekstu i obrazu, aby "rozumieć" treść dokumentów tak, jak człowiek.
+- Przyspieszenie pracy urzędników ZUS  
+- Automatyczne wyłapywanie niespójności w dokumentach  
+- Redukcja błędów związanych z ręcznym przepisywaniem danych  
+- Przygotowanie projektu opinii i projektu Karty Wypadku  
+- Zachowanie pełnej kontroli pracownika nad rozstrzygnięciem  
 
-*   **Analiza Obrazu:** System "widzi" skany, dzięki czemu rozpoznaje pieczątki i pismo ręczne - Unstructured.ai do OCR
-*   **Analiza Tekstu:** Wyciąga kluczowe dane (daty, nazwiska) i układa je w logiczną całość.
-*   **Bezpieczeństwo:** System działa na zanonimizowanych danych uczących, opartych na rzeczywistych wzorach dokumentacji ZUS.
+ZANT **nie decyduje zamiast urzędnika** — dostarcza mu kompletnej analizy, dzięki której decyzja jest szybsza i bardziej rzetelna.
+
+---
+
+## 🔍 Funkcje ZANT (Etap II)
+
+### 1. Odczyt dokumentów (OCR + AI)
+System automatycznie odczytuje:
+
+- skany PDF,  
+- zdjęcia dokumentów,  
+- **pismo odręczne** poszkodowanego i świadków.
+
+Wykorzystujemy **Unstructured.ai** oraz modele OCR dostosowane do specyfiki polskich formularzy.
+
+---
+
+### 2. Automatyczna ekstrakcja danych
+ZANT samodzielnie wydobywa z dokumentów kluczowe informacje:
+
+- daty i godziny,
+- imiona i nazwiska,
+- opis przebiegu zdarzenia,
+- opisy urazu,
+- numery spraw i identyfikatory,
+- treść wyjaśnień.
+
+Wynik: uporządkowana i przeszukiwalna baza faktów.
+
+---
+
+### 3. Weryfikacja spójności dokumentacji
+System porównuje dane z różnych źródeł i wskazuje potencjalne błędy:
+
+- rozbieżności w datach i godzinach,  
+- różne wersje miejsca lub okoliczności zdarzenia,  
+- brak potwierdzenia urazu w dokumentacji medycznej,  
+- niespójności między wyjaśnieniami a kartą lekarską.
+
+Przykład komunikatu:
+
+> „Data w zgłoszeniu (12.05) nie zgadza się z datą w dokumentacji lekarskiej (13.05).”
+
+---
+
+### 4. Analiza spełnienia definicji wypadku
+ZANT ocenia, czy w dokumentach znajdują się elementy czterech przesłanek:
+
+- **nagłość zdarzenia**,  
+- **przyczyna zewnętrzna**,  
+- **uraz**,  
+- **związek z pracą**.
+
+System nie podejmuje decyzji, ale oznacza braki i podpowiada, czego brakuje do pełnej oceny.
+
+---
+
+### 5. Wskazywanie braków w dokumentacji
+Narzędzie automatycznie generuje listę braków, np.:
+
+- brak świadków lub brak ich wyjaśnień,  
+- niejasny opis urazu,  
+- brak podpisów,  
+- brak dokumentacji medycznej potwierdzającej uraz.
+
+Braki są klasyfikowane jako:
+
+- **krytyczne**,  
+- **ważne**,  
+- **opcjonalne**.
+
+---
+
+### 6. Wsparcie w kwestiach medycznych
+Przy skomplikowanych urazach system:
+
+- wskazuje fragmenty wymagające konsultacji,  
+- podpowiada pytania do Lekarza Orzecznika, np.:
+
+> „Czy stwierdzony uraz kręgosłupa pozostaje w związku z mechanizmem upadku z wysokości ok. 1 m?”
+
+---
+
+### 7. Generowanie projektu opinii (brudnopis)
+ZANT przygotowuje propozycję opinii zawierającą:
+
+- opis stanu faktycznego,  
+- wskazanie dowodów,  
+- analizę przesłanek,  
+- proponowane rozstrzygnięcie (do akceptacji urzędnika).
+
+Urzędnik może łatwo edytować i dopracować treść.
+
+---
+
+### 8. Automatyczne przygotowanie **Karty Wypadku**
+System uzupełnia projekt Karty Wypadku zgodnie z obowiązującym wzorem:
+
+- jednoznaczne dane → wpisywane automatycznie,  
+- niepewne dane → oznaczone jako **„DO UZUPEŁNIENIA”**.
+
+Urzędnik nie musi przepisywać treści — system robi to za niego.
+
+---
+
+## 🛠️ Technologia
+
+- **OCR / Computer Vision:** Unstructured.ai, custom OCR  
+- **Analiza tekstu:** modele GPT z dopasowanymi guardrails  
+- **Silnik regułowy:** walidacja braków i spójności  
+- **Generator dokumentów:** PDF + Karta Wypadku  
+- **Bezpieczeństwo:** anonimizacja danych uczących, zgodność z procedurami ZUS
+
+---
+
+## 📌 Podsumowanie
+
+ZANT to narzędzie, które:
+- przyspiesza proces analizy wypadku,  
+- redukuje obciążenie administracyjne,  
+- poprawia jakość decyzji,  
+- zapewnia pełną transparentność i kontrolę dla urzędnika.
+
+System nie zastępuje człowieka — **wzmacnia jego efektywność**.
+
