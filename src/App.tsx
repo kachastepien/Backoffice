@@ -13,14 +13,18 @@ type View = 'dashboard' | 'case-detail';
 export default function App() {
   const [currentView, setCurrentView] = useState<View>('dashboard');
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
+  const [initialFileForCase, setInitialFileForCase] = useState<any>(null);
 
-  const handleNavigateToCase = (caseId: string) => {
+  const handleNavigateToCase = (caseId: string, file?: any) => {
     setSelectedCaseId(caseId);
+    if (file) setInitialFileForCase(file);
+    else setInitialFileForCase(null);
     setCurrentView('case-detail');
   };
 
   const handleNavigateHome = () => {
     setSelectedCaseId(null);
+    setInitialFileForCase(null);
     setCurrentView('dashboard');
   };
 
@@ -94,6 +98,7 @@ export default function App() {
             <CaseDetail 
               caseId={selectedCaseId} 
               onBack={handleNavigateHome} 
+              initialFile={initialFileForCase}
             />
           )}
         </div>

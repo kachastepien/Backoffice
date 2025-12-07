@@ -1,12 +1,13 @@
 
-import React, { useState } from 'react';
-import { Search, Bell, Filter, MoreVertical, Plus, UserPlus, FileText, Calendar, X } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { Search, Bell, Filter, MoreVertical, Plus, UserPlus, FileText, Calendar, X, Upload, Check, RefreshCw } from 'lucide-react';
 import { useCases } from '../lib/CaseContext';
 import { Case } from '../lib/types';
 import { toast } from 'sonner';
+import { projectId } from '../utils/supabase/info';
 
 interface DashboardProps {
-  onSelectCase: (caseId: string) => void;
+  onSelectCase: (caseId: string, file?: any) => void;
 }
 
 export function Dashboard({ onSelectCase }: DashboardProps) {
@@ -18,6 +19,54 @@ export function Dashboard({ onSelectCase }: DashboardProps) {
   const [newApplicantPesel, setNewApplicantPesel] = useState("");
   const [newAccidentDate, setNewAccidentDate] = useState("");
   const [newDescription, setNewDescription] = useState("");
+  
+  // File Upload State
+  const [uploadedFile, setUploadedFile] = useState<any>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handlePreUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      // Reset form
+      setNewApplicantName("");
+      setNewApplicantPesel("");
+      setNewAccidentDate("");
+      setNewDescription("");
+
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+          const content = reader.result as string;
+          const fileObj = { name: file.name, type: file.type, content: content };
+          setUploadedFile(fileObj);
+          
+          // Auto analyze
+          setIsAnalyzing(true);
+          try {
+               const response = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-a27dc869/extract-metadata`, {
+                   method: 'POST',
+                   headers: { 'Content-Type': 'application/json' },
+                   body: JSON.stringify({ file: fileObj })
+               });
+               const data = await response.json();
+               if (data.error) throw new Error(data.error);
+
+               if (data.applicantName) setNewApplicantName(data.applicantName);
+               if (data.applicantPesel) setNewApplicantPesel(data.applicantPesel);
+               if (data.accidentDate) setNewAccidentDate(data.accidentDate);
+               if (data.description) setNewDescription(data.description);
+               
+               toast.success("Dane formularza uzupełnione automatycznie przez AI!");
+          } catch (err: any) {
+              console.error(err);
+              toast.error("Nie udało się odczytać danych automatycznie, ale plik został dołączony.");
+          } finally {
+              setIsAnalyzing(false);
+          }
+      };
+      reader.readAsDataURL(file);
+  };
 
   const handleCreateCase = (e: React.FormEvent) => {
       e.preventDefault();
@@ -30,18 +79,40 @@ export function Dashboard({ onSelectCase }: DashboardProps) {
           applicantName: newApplicantName,
           applicantPesel: newApplicantPesel || "brak",
           accidentDate: newAccidentDate,
-          businessType: newDescription || "Zgłoszenie ręczne",
+          businessType: newDescription || "Zgłoszenie z pliku",
           description: newDescription
       });
       
       setShowNewCaseModal(false);
-      onSelectCase(newId); // Auto-open new case
+      onSelectCase(newId, uploadedFile); // Pass file to next view
       
       // Reset form
       setNewApplicantName("");
       setNewApplicantPesel("");
       setNewAccidentDate("");
       setNewDescription("");
+      setUploadedFile(null);
+  };
+
+  const loadDemoData = () => {
+      const demoCases = [
+          { name: "Jan Nowak", pesel: "80010112345", date: "2024-05-10", desc: "Upadek z rusztowania na budowie", risk: 85 },
+          { name: "Anna Kowalska", pesel: "92031509876", date: "2024-05-12", desc: "Poślizgnięcie na mokrej podłodze w biurze", risk: 20 },
+          { name: "Piotr Wiśniewski", pesel: "78112005432", date: "2024-05-14", desc: "Wypadek komunikacyjny w drodze do klienta", risk: 45 },
+          { name: "Krzysztof Zieliński", pesel: "85070512345", date: "2024-05-15", desc: "Uraz dłoni przy obsłudze piły tarczowej", risk: 60 },
+          { name: "Maria Lewandowska", pesel: "65022806789", date: "2024-05-16", desc: "Zawał serca podczas spotkania z zarządem", risk: 90 }
+      ];
+
+      demoCases.forEach(c => {
+          addCase({
+              applicantName: c.name,
+              applicantPesel: c.pesel,
+              accidentDate: c.date,
+              businessType: c.desc,
+              description: c.desc
+          });
+      });
+      toast.success("Załadowano 5 spraw testowych dla Jury!");
   };
 
   return (
@@ -50,7 +121,7 @@ export function Dashboard({ onSelectCase }: DashboardProps) {
       <div className="bg-white border-b border-slate-200 px-8 py-5 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Pulpit Orzecznika</h1>
-          <p className="text-slate-500">Witaj, Marek Kowalczyk</p>
+          <p className="text-slate-500">Witaj, Marek Kowalczyk (Tryb Ekspercki)</p>
         </div>
         
         <div className="flex items-center gap-4">
@@ -85,6 +156,13 @@ export function Dashboard({ onSelectCase }: DashboardProps) {
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-lg font-bold text-slate-800">Moje zadania</h2>
           <div className="flex gap-3">
+             <button 
+                onClick={loadDemoData}
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg hover:bg-indigo-200 shadow-sm transition-all font-medium"
+            >
+              <FileText className="h-4 w-4" />
+              Załaduj Zestaw Testowy (Jury)
+            </button>
              <button 
                 onClick={() => setShowNewCaseModal(true)}
                 className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 shadow-sm transition-all"
@@ -175,6 +253,58 @@ export function Dashboard({ onSelectCase }: DashboardProps) {
                   </div>
                   
                   <form onSubmit={handleCreateCase} className="p-6 space-y-4">
+                      {/* FILE UPLOAD AREA */}
+                      <div 
+                        onClick={() => !isAnalyzing && fileInputRef.current?.click()}
+                        className={`border-2 border-dashed rounded-xl p-6 text-center transition-all cursor-pointer relative overflow-hidden group ${
+                            uploadedFile ? 'border-emerald-400 bg-emerald-50' : 'border-slate-300 hover:border-indigo-400 hover:bg-slate-50'
+                        }`}
+                      >
+                          <input type="file" ref={fileInputRef} onChange={handlePreUpload} className="hidden" accept=".pdf,image/*" />
+                          
+                          {isAnalyzing ? (
+                              <div className="flex flex-col items-center justify-center py-2">
+                                  <RefreshCw className="h-8 w-8 text-indigo-600 animate-spin mb-3" />
+                                  <span className="font-bold text-indigo-700">Analiza dokumentu (AI)...</span>
+                                  <span className="text-xs text-indigo-500 mt-1">Wyciągam dane do formularza</span>
+                              </div>
+                          ) : uploadedFile ? (
+                              <div className="flex flex-col items-center py-2">
+                                  <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center mb-3">
+                                      <Check className="h-6 w-6 text-emerald-600" />
+                                  </div>
+                                  <span className="font-bold text-emerald-800">{uploadedFile.name}</span>
+                                  <span className="text-xs text-emerald-600 mt-1">Plik gotowy do dołączenia do sprawy</span>
+                                  <button 
+                                    type="button"
+                                    onClick={(e) => { e.stopPropagation(); setUploadedFile(null); }}
+                                    className="mt-3 text-xs text-red-500 hover:text-red-700 underline"
+                                  >
+                                      Usuń plik
+                                  </button>
+                              </div>
+                          ) : (
+                              <div className="flex flex-col items-center py-2">
+                                  <div className="w-12 h-12 bg-indigo-50 rounded-full flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                                      <Upload className="h-6 w-6 text-indigo-600" />
+                                  </div>
+                                  <span className="font-medium text-slate-700">Kliknij, aby wgrać skan/PDF zgłoszenia</span>
+                                  <span className="text-xs text-slate-500 mt-1 max-w-xs">
+                                      System automatycznie odczyta dane (Imię, Datę, Opis) i wypełni formularz poniżej.
+                                  </span>
+                              </div>
+                          )}
+                      </div>
+
+                      <div className="relative">
+                          <div className="absolute inset-0 flex items-center" aria-hidden="true">
+                            <div className="w-full border-t border-slate-200"></div>
+                          </div>
+                          <div className="relative flex justify-center">
+                            <span className="px-2 bg-white text-xs text-slate-400 uppercase tracking-wide">Lub wpisz ręcznie</span>
+                          </div>
+                      </div>
+
                       <div>
                           <label className="block text-sm font-medium text-slate-700 mb-1">Imię i Nazwisko Wnioskodawcy <span className="text-red-500">*</span></label>
                           <input 

@@ -9,6 +9,7 @@ import { AccidentCardView } from './AccidentCardView';
 interface CaseDetailProps {
   caseId: string;
   onBack: () => void;
+  initialFile?: { name: string, content: string, type: string } | null;
 }
 
 type Tab = 'docs' | 'analysis' | 'opinion' | 'card';
@@ -20,7 +21,7 @@ interface MedicalOpinion {
     timestamp: string;
 }
 
-export function CaseDetail({ caseId, onBack }: CaseDetailProps) {
+export function CaseDetail({ caseId, onBack, initialFile }: CaseDetailProps) {
   const [activeTab, setActiveTab] = useState<Tab>('docs');
   
   const { getCase } = useCases();
@@ -48,7 +49,13 @@ export function CaseDetail({ caseId, onBack }: CaseDetailProps) {
     setDecisionState('pending');
     setRejectReason("");
     setMedicalOpinion(null);
-  }, [caseId]);
+    if (initialFile) {
+        setUploadedFiles([initialFile]);
+        toast.success(`Zaimportowano plik: ${initialFile.name}`);
+    } else {
+        setUploadedFiles([]);
+    }
+  }, [caseId, initialFile]);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -124,14 +131,14 @@ export function CaseDetail({ caseId, onBack }: CaseDetailProps) {
       if (caseState.result.legal_opinion_draft) return caseState.result.legal_opinion_draft;
 
       const r = caseState.result;
-      return `OPINIA W SPRAWIE KWALIFIKACJI PRAWNEJ ZDARZENIA\n\n1. DANE IDENTYFIKACYJNE\nWnioskodawca: ${currentCase?.applicantName}\nData zdarzenia: ${currentCase?.accidentDate}\n\n2. ANALIZA MATERIAŁU DOWODOWEGO\nPrzeanalizowano dokumentację:\n${(r.identified_documents || []).map((d: string) => `- ${d}`).join('\n')}\n\n3. USTALONY STAN FAKTYCZNY\n${r.summary}\n\n4. OCENA PRAWNA\n${Object.entries(r.criteria_explanation || {}).map(([k, v]) => `- ${k.toUpperCase()}: ${v}`).join('\n')}\n\n5. WSKAŹNIK PEWNOŚCI AI\nWynik: ${r.calculation?.confidence_score}%\nUzasadnienie: ${r.calculation?.reasoning_short}\n\nSporządzono w systemie ZANT.`;
+      return `PROJEKT OPINII / NOTATKA SŁUŻBOWA (ZANT)\n\n1. DANE IDENTYFIKACYJNE\nWnioskodawca: ${currentCase?.applicantName}\nData zdarzenia: ${currentCase?.accidentDate}\n\n2. ANALIZA MATERIAŁU DOWODOWEGO\nPrzeanalizowano dokumentację:\n${(r.identified_documents || []).map((d: string) => `- ${d}`).join('\n')}\n\n3. USTALONY STAN FAKTYCZNY\n${r.summary}\n\n4. WERYFIKACJA PRZESŁANEK\n${Object.entries(r.criteria_explanation || {}).map(([k, v]) => `- ${k.toUpperCase()}: ${v}`).join('\n')}\n\n5. WSKAŹNIK PEWNOŚCI ASYSTENTA\nWynik: ${r.calculation?.confidence_score}%\nUzasadnienie: ${r.calculation?.reasoning_short}\n\nWygenerowano automatycznie przez system ZANT. Dokument wymaga weryfikacji i podpisu urzędnika.`;
   }
 
   const renderProgress = () => {
       const steps = [
           { id: 'ocr_processing', label: 'OCR & Weryfikacja', icon: ScanText },
-          { id: 'legal_analysis', label: 'Analiza Prawna (Agent)', icon: Scale },
-          { id: 'calculating_confidence', label: 'Kalkulator Pewności', icon: Calculator }
+          { id: 'legal_analysis', label: 'Analiza Zgłoszenia (Asystent)', icon: Scale },
+          { id: 'calculating_confidence', label: 'Wsparcie Decyzyjne', icon: Calculator }
       ];
 
       const currentStepIndex = steps.findIndex(s => s.id === caseState.step);
@@ -335,9 +342,13 @@ export function CaseDetail({ caseId, onBack }: CaseDetailProps) {
                                     <FileCheck className="h-4 w-4 text-slate-500" />
                                     Ustalenia faktyczne (AI Summary)
                                 </h4>
-                                <div className="bg-slate-50 p-4 rounded-lg text-sm text-slate-700 leading-relaxed border border-slate-100">
-                                    {caseState.result.summary}
-                                </div>
+                                {caseState.result.summary ? (
+                                    <div className="bg-slate-50 p-4 rounded-lg text-sm text-slate-700 leading-relaxed border border-slate-100">
+                                        {caseState.result.summary}
+                                    </div>
+                                ) : (
+                                    <div className="text-sm text-slate-400 italic">Brak podsumowania - dokument może być nieczytelny.</div>
+                                )}
                            </div>
                       </div>
                   </div>
@@ -387,6 +398,7 @@ export function CaseDetail({ caseId, onBack }: CaseDetailProps) {
                   )}
 
                   {/* Criteria List */}
+                  {caseState.result.criteria && (
                   <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
                       <h3 className="font-semibold text-slate-900 mb-4">Szczegółowa weryfikacja przesłanek</h3>
                       <div className="space-y-3">
@@ -396,6 +408,7 @@ export function CaseDetail({ caseId, onBack }: CaseDetailProps) {
                         <CriterionItem label="Związek z pracą" passed={caseState.result.criteria?.workConnection ?? null} explanation={caseState.result.criteria_explanation?.workConnection} />
                       </div>
                   </div>
+                  )}
 
                   {/* Medical Consultation Panel */}
                    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
@@ -445,11 +458,12 @@ export function CaseDetail({ caseId, onBack }: CaseDetailProps) {
                 <div className="lg:col-span-5 space-y-6">
                     
                     {/* CONFIDENCE CARD */}
+                    {caseState.result.calculation?.confidence_score !== undefined ? (
                     <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                          <div className="bg-slate-900 px-6 py-3 border-b border-slate-800 flex justify-between items-center">
                               <h3 className="font-semibold text-white text-sm uppercase tracking-wide flex items-center gap-2">
                                 <Sparkles className="h-4 w-4 text-emerald-400" />
-                                Rekomendacja AI
+                                Rekomendacja Asystenta
                               </h3>
                          </div>
                          <div className="p-6">
@@ -497,6 +511,15 @@ export function CaseDetail({ caseId, onBack }: CaseDetailProps) {
                               </div>
                          </div>
                     </div>
+                    ) : (
+                        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 text-center">
+                             <AlertTriangle className="h-10 w-10 text-slate-300 mx-auto mb-3" />
+                             <h3 className="font-semibold text-slate-700">Brak rekomendacji</h3>
+                             <p className="text-sm text-slate-500 mt-1">
+                                Asystent nie był w stanie wyliczyć wskaźnika pewności na podstawie dostępnych danych.
+                             </p>
+                        </div>
+                    )}
 
                     {/* DECISION PANEL */}
                     <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden sticky top-24">

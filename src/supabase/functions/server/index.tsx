@@ -41,23 +41,37 @@ async function extractTextWithUnstructured(base64Data: string, filename: string 
   formData.append('strategy', 'hi_res');
   formData.append('languages', 'pol');
 
-  const response = await fetch("https://api.unstructuredapp.io/general/v0/general", {
-    method: "POST",
-    headers: {
-      "unstructured-api-key": apiKey,
-    },
-    body: formData,
-  });
+  // Add timeout for OCR
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 12000); // 12s max for OCR
 
-  if (!response.ok) {
-    const errText = await response.text();
-    console.error(`Unstructured Error for ${filename}:`, errText);
-    return `[Błąd odczytu pliku ${filename}]`; 
+  try {
+      const response = await fetch("https://api.unstructuredapp.io/general/v0/general", {
+        method: "POST",
+        headers: {
+          "unstructured-api-key": apiKey,
+        },
+        body: formData,
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errText = await response.text();
+        console.error(`Unstructured Error for ${filename}:`, errText);
+        return `[Błąd odczytu pliku ${filename}]`; 
+      }
+
+      const data = await response.json();
+      const text = data.map((item: any) => item.text).join("\n");
+      return text;
+  } catch (err) {
+      if (err.name === 'AbortError') {
+          console.error(`OCR Timeout for ${filename}`);
+          return `[Błąd: Przekroczono czas oczekiwania na OCR (dokument zbyt złożony lub nieczytelny). Wymagana weryfikacja ręczna.]`;
+      }
+      throw err;
   }
-
-  const data = await response.json();
-  const text = data.map((item: any) => item.text).join("\n");
-  return text;
 }
 
 app.post("/make-server-a27dc869/analyze-case", async (c) => {
@@ -134,7 +148,10 @@ app.post("/make-server-a27dc869/analyze-case", async (c) => {
     }
 
     const analystPrompt = `
-      Jesteś Starszym Inspektorem ZUS. Analizujesz dokumentację wypadkową pod kątem sporządzenia Karty Wypadku i Opinii Prawnej.
+      Jesteś inteligentnym asystentem Starszego Inspektora ZUS. 
+      Twój cel: Wstępna weryfikacja dokumentacji wypadkowej i przygotowanie brudnopisu (projektu) Karty Wypadku.
+      
+      NIE WYDAJESZ WYROKÓW. Jedynie analizujesz fakty i sugerujesz wnioski, które musi zatwierdzić człowiek.
       
       ZADANIA:
       1. Przeanalizuj załączone obrazy dokumentów ORAZ tekst z OCR.
@@ -144,20 +161,20 @@ app.post("/make-server-a27dc869/analyze-case", async (c) => {
       ZADANIA MERYTORYCZNE:
       1. Odczytaj wszystkie dane (daty, miejsca, nazwiska, przebieg).
       2. Wykryj ROZBIEŻNOŚCI (np. inna data w zgłoszeniu i u lekarza).
-      3. Zweryfikuj definicję wypadku (nagłość, przyczyna zew., uraz, związek z pracą).
+      3. Zweryfikuj wstępnie przesłanki wypadku (nagłość, przyczyna zew., uraz, związek z pracą).
       4. Jeśli są wątpliwości -> wskaż BRAKUJĄCE DOKUMENTY (np. "Brak wyjaśnień świadka X").
       5. Jeśli uraz jest niejasny -> Zaleć konsultację z Głównym Lekarzem Orzecznikiem (GLO).
       6. Przygotuj dane do KARTY WYPADKU (zgodnie z rozporządzeniem).
-      7. Sformułuj PROJEKT OPINII (uzasadnienie prawne).
-
+      7. Sformułuj PROJEKT NOTATKI SŁUŻBOWEJ / OPINII (wsparcie dla decyzji).
+ 
       ZASADY WYPEŁNIANIA DANYCH (CRITICAL):
       - Jeśli nie możesz odczytać danej informacji z dokumentu (np. nieczytelne pismo, zamazane zdjęcie, brak strony), wpisz w polu dokładnie: "DO UZUPEŁNIENIA".
       - Nie zgaduj danych osobowych ani dat.
       - Jeśli większość dokumentu jest nieczytelna, w polu 'summary' napisz: "UWAGA: Analiza ograniczona z powodu niskiej jakości skanów. Wymagana weryfikacja ręczna."
       - W 'missing_documents_suggestions' dodaj: "Poprawa jakości skanu (dokument nieczytelny)", jeśli dotyczy.
-
+ 
       WAŻNE: Jeśli dokument jest nieczytelny, zwróć null w polach kryteriów (criteria).
-
+ 
       Zwróć JSON:
       {
         "identified_documents": ["lista dokumentów"],
@@ -186,7 +203,7 @@ app.post("/make-server-a27dc869/analyze-case", async (c) => {
             "causes": "Przyczyny wypadku (np. poślizgnięcie, niesprawna maszyna)",
             "effects": "Skutki (rodzaj urazu, część ciała)"
         },
-        "legal_opinion_draft": "Pełna treść projektu opinii. Format: \n1. Ustalenia faktyczne... \n2. Ocena prawna... \n3. Wnioski (Uznać/Nie uznać)... \n4. Uzasadnienie..."
+        "legal_opinion_draft": "Treść projektu opinii. Format: \n1. Ustalenia faktyczne... \n2. Weryfikacja przesłanek... \n3. Rekomendacja (Uznać/Nie uznać)... \n4. Uzasadnienie..."
       }
     `;
 
@@ -232,7 +249,7 @@ app.post("/make-server-a27dc869/analyze-case", async (c) => {
     // Step 3: Calculation Agent (Agent 2: Actuary/Calculator)
     const calculatorPrompt = `
       Actuary Agent ZUS.
-      INPUT: JSON z oceną prawną.
+      INPUT: JSON z weryfikacją kryteriów.
       LOGIKA:
       - Jeśli kryteria są null (brak danych/błąd) -> Pewność 0%. Rekomendacja: DO WYJAŚNIENIA.
       - Jeśli jakiekolwiek kryterium = false -> Pewność < 20%.
@@ -342,6 +359,86 @@ app.post("/make-server-a27dc869/consult-doctor", async (c) => {
   } catch (e) {
     console.error(e);
     return c.json({ error: e.message }, 500);
+  }
+});
+
+app.post("/make-server-a27dc869/extract-metadata", async (c) => {
+  try {
+    const body = await c.req.json();
+    const { file } = body; // { name, content, type }
+
+    const openaiKey = Deno.env.get("OPENAI_API_KEY");
+    if (!openaiKey) return c.json({ error: "Server missing OPENAI_API_KEY" }, 500);
+
+    let userMessageContent = [];
+    userMessageContent.push({ type: "text", text: `Dokument: ${file.name}` });
+
+    if (file.type && file.type.startsWith('image/')) {
+        userMessageContent.push({
+            type: "image_url",
+            image_url: { url: file.content }
+        });
+    } else {
+        // Text/PDF extraction via Unstructured
+        try {
+            const text = await extractTextWithUnstructured(file.content, file.name);
+             userMessageContent.push({ 
+                type: "text", 
+                text: `TREŚĆ DOKUMENTU (OCR):\n${text}` 
+            });
+        } catch (e) {
+             console.error("OCR Error in metadata extraction:", e);
+             userMessageContent.push({ 
+                type: "text", 
+                text: "[UWAGA: OCR nieudany. Spróbuj wywnioskować dane tylko z nazwy pliku lub zwróć puste pola, aby użytkownik uzupełnił ręcznie.]" 
+            });
+        }
+    }
+
+    const prompt = `
+        Jesteś asystentem ZUS. Twoim zadaniem jest WSTĘPNE wypełnienie formularza rejestracji sprawy na podstawie załączonego dokumentu.
+        
+        Wyciągnij następujące dane (jeśli brak - zwróć pusty string):
+        1. Imię i Nazwisko poszkodowanego (applicantName)
+        2. PESEL (applicantPesel) - jeśli są spacje usuń je.
+        3. Data wypadku (accidentDate) - format YYYY-MM-DD. Jeśli nie ma roku, załóż bieżący.
+        4. Krótki opis zdarzenia (description) - jedno zdanie opisujące CO się stało (np. "Upadek ze schodów", "Zawał serca").
+
+        Zwróć JSON:
+        {
+            "applicantName": string,
+            "applicantPesel": string,
+            "accidentDate": string,
+            "description": string
+        }
+    `;
+
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${openaiKey}`
+      },
+      body: JSON.stringify({
+        model: "gpt-4o",
+        messages: [
+            { role: "system", content: prompt },
+            { role: "user", content: userMessageContent }
+        ],
+        response_format: { type: "json_object" },
+        max_tokens: 300
+      })
+    });
+
+    const data = await response.json();
+    if (data.error) throw new Error(data.error.message);
+    
+    const result = JSON.parse(data.choices[0].message.content);
+    return c.json(result);
+
+  } catch (e) {
+      console.error("Extract Metadata Error:", e);
+      return c.json({ error: e.message }, 500);
   }
 });
 
